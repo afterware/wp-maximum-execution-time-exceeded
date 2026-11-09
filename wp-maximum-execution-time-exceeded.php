@@ -2,13 +2,17 @@
 
 /**
 
- * Plugin Name: WP Maximum Execution Time Exceeded
+ * Plugin Name: WP Maximum Execution Time Exceeded — Afterware
 
  * Plugin URI: http://johnniejodelljr.com/wp-aximum-execution-time-exceeded/
 
+ * Update URI: https://updates.afterware.io/wp-maximum-execution-time-exceeded
+
  * Description: Increase the maximum execution time to 5 minutes. 
 
- * Version: 1.0.3
+ * Version: 1.0.3.1
+ * Requires PHP: 8.3.28
+ * Requires at least: 6.8.3
 
  * Author: Johnnie J. O'Dell Jr.
 
@@ -53,10 +57,14 @@ function wpmete_on_activation_wc(){
 		php_value max_execution_time 300
 	</IfModule>";
 
-	$htaccess = get_home_path().'.htaccess';
-	$contents = @file_get_contents($htaccess);
-	if(!strpos($htaccess,$wpmetetxt))
-	file_put_contents($htaccess,$contents.$wpmetetxt);
+	if ( ! function_exists( 'get_home_path' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+	}
+	$htaccess = get_home_path() . '.htaccess';
+	$contents = file_exists( $htaccess ) ? file_get_contents( $htaccess ) : '';
+	if ( false !== $contents && false === strpos( $contents, $wpmetetxt ) ) {
+		file_put_contents( $htaccess, $contents . $wpmetetxt );
+	}
 }
 
 
@@ -71,12 +79,33 @@ function wpmete_on_deactivation_dc(){
 		php_value max_execution_time 300
 	</IfModule>";
 
-	$htaccess = get_home_path().'.htaccess';
-	$contents = @file_get_contents($htaccess);
-	file_put_contents($htaccess,str_replace($wpmetetxt,'',$contents));
+	if ( ! function_exists( 'get_home_path' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+	}
+	$htaccess = get_home_path() . '.htaccess';
+	if ( ! file_exists( $htaccess ) ) {
+		return;
+	}
+	$contents = file_get_contents( $htaccess );
+	if ( false !== $contents && false !== strpos( $contents, $wpmetetxt ) ) {
+		file_put_contents( $htaccess, str_replace( $wpmetetxt, '', $contents ) );
+	}
 	
 }
 
+
+/** Ask PHP to allow longer requests where the host permits runtime changes. */
+function wpmete_apply_runtime_limit() {
+    if ( ! is_callable( 'set_time_limit' ) ) {
+        return;
+    }
+    $current = (int) ini_get( 'max_execution_time' );
+    // Zero means unlimited; never shorten an existing limit.
+    if ( $current > 0 && $current < 300 ) {
+        @set_time_limit( 300 );
+    }
+}
+add_action( 'init', 'wpmete_apply_runtime_limit' );
 
 register_activation_hook(   __FILE__, 'wpmete_on_activation_wc' );
 
